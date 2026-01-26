@@ -9,10 +9,13 @@ const AramexAwb=()=>{
   const [loading, setLoading] = useState(false);
   const [renamedFiles, setRenamedFiles] = useState([]);
 
-  // Regex method same tarike se jaise DhlInvoice me tha (match[1] use karte hain)
-  // Lekin pattern FedexInvoice ka use hoga:
   const extractInvoiceNumber = (text) => {
-    const regexList = [ /\bAWB\s*No\.?\s*[:\-]?\s*(\d{10,12})\b/i,/\bWaybill\s*No\.?\s*[:\-]?\s*(\d{10,12})\b/i,/\bAir\s*Waybill\s*[:\-]?\s*(\d{10,12})\b/i,/\b(\d{10,12})\b/]; // aramex ka regex
+const regexList = [
+  /\bAWB\s*No\.?\s*[:-]?\s*(\d{10,12})\b/i,
+  /\bWaybill\s*No\.?\s*[:-]?\s*(\d{10,12})\b/i,
+  /\bAir\s*Waybill\s*[:-]?\s*(\d{10,12})\b/i,
+  /\b(\d{10,12})\b/
+];// aramex ka regex
     for (let regex of regexList) {
       const match = text.match(regex);
       if (match) {
