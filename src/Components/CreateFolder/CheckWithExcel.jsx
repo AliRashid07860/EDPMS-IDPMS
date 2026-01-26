@@ -4,130 +4,169 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 
+/* ---------- PDF WORKER ---------- */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
+/* ---------- HELPERS ---------- */
+const normalizeAWB = (value = "") => value.replace(/\D/g, "");
+const isImage = (name = "") => /\.(png|jpg|jpeg)$/i.test(name);
+
+/* ---------- COMPONENT ---------- */
 const CheckWithExcel = () => {
   const [awbText, setAwbText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isImage = (fileName) => /\.(png|jpg|jpeg)$/i.test(fileName);
-
-  const handleFiles = async (files) => {
+  const handleFiles = async (fileList) => {
     if (!awbText.trim()) {
       alert("Please enter AWB numbers");
+      return;
+    }
+
+    if (!fileList || fileList.length === 0) {
+      alert("Please upload files");
       return;
     }
 
     setLoading(true);
 
     const awbList = awbText
-      .split("\n")
-      .map((a) => a.trim())
+      .split(/\r?\n/)
+      .map(a => normalizeAWB(a))
       .filter(Boolean);
 
     const zip = new JSZip();
     const folderData = {};
 
     try {
-      for (const file of files) {
+      for (const file of Array.from(fileList)) {
         let matchedAwb = null;
 
-        // IMAGE
+        /* ---------- IMAGE CHECK ---------- */
         if (isImage(file.name)) {
+          const cleanName = normalizeAWB(file.name);
+
           for (const awb of awbList) {
-            if (file.name.includes(awb)) {
+            if (cleanName.includes(awb)) {
               matchedAwb = awb;
               break;
             }
           }
         }
 
-        // PDF
+        /* ---------- PDF CHECK ---------- */
         else if (file.type === "application/pdf") {
           const buffer = await file.arrayBuffer();
           const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
 
-          let text = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const tc = await page.getTextContent();
-            text += tc.items.map((it) => it.str).join(" ");
+          let combinedText = "";
+
+          for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+
+            const sorted = content.items.sort((a, b) => {
+              const yDiff = b.transform[5] - a.transform[5];
+              if (Math.abs(yDiff) > 5) return yDiff;
+              return a.transform[4] - b.transform[4];
+            });
+
+            combinedText += sorted.map(i => i.str).join("");
           }
 
-          const cleanText = text.replace(/\s+/g, "");
+          const cleanPdfText = normalizeAWB(combinedText);
 
           for (const awb of awbList) {
-            if (cleanText.includes(awb)) {
+            if (cleanPdfText.includes(awb)) {
               matchedAwb = awb;
               break;
             }
           }
         }
 
+        /* ---------- STORE FILE ---------- */
         if (matchedAwb) {
           if (!folderData[matchedAwb]) {
-            folderData[matchedAwb] = { count: 0, files: [] };
+            folderData[matchedAwb] = { files: [] };
             zip.folder(matchedAwb);
           }
 
-          folderData[matchedAwb].count++;
           folderData[matchedAwb].files.push(file.name);
           zip.folder(matchedAwb).file(file.name, file);
         }
       }
 
-      const excelData = Object.keys(folderData).map((awb) => ({
+      /* ---------- EXCEL ---------- */
+      const excelRows = Object.keys(folderData).map(awb => ({
         "AWB Number": awb,
-        "Total Files": folderData[awb].count,
+        "Total Files": folderData[awb].files.length,
         "File Names": folderData[awb].files.join(", "),
       }));
 
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "AWB Report");
+      const ws = XLSX.utils.json_to_sheet(excelRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "AWB Report");
 
-      const excelBuffer = XLSX.write(workbook, {
+      const excelBuffer = XLSX.write(wb, {
         bookType: "xlsx",
         type: "array",
       });
 
       zip.file("AWB_REPORT.xlsx", excelBuffer);
 
-      const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, "AWB_MATCH_RESULT.zip");
+      /* ---------- DOWNLOAD ZIP ---------- */
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      saveAs(zipBlob, "AWB_MATCH_RESULT.zip");
+
+      alert("✅ Processing completed successfully");
     } catch (err) {
       console.error(err);
-      alert("Error while processing files");
+      alert("❌ Error while processing files");
     }
 
     setLoading(false);
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h3>AWB → PDF + Image Matcher with Excel</h3>
+    <div style={{ maxWidth: 700, padding: 20 }}>
+      <h2>Create Folder to save Document</h2>
 
       <textarea
-        rows="6"
-        placeholder="Enter AWB numbers (one per line)"
+        rows={4}
         value={awbText}
         onChange={(e) => setAwbText(e.target.value)}
-        style={{ width: "100%", marginBottom: 10 }}
+        placeholder="Enter AWB numbers (one per line)"
+        style={{ width: "100%", marginBottom: 15 }}
       />
 
-      <label style={{ background: "#007bff", color: "#fff", padding: "10px 16px", cursor: "pointer" }}>
-        Upload PDFs + Images
+      <label
+        style={{
+          background: "#0066cc",
+          color: "#fff",
+          padding: "10px 18px",
+          cursor: "pointer",
+          borderRadius: 4,
+          display: "inline-block",
+        }}
+      >
+       Upload Document
         <input
           type="file"
           multiple
           accept="application/pdf,image/png,image/jpeg"
           style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
       </label>
 
-      {loading && <p>Processing files, please wait…</p>}
+      {loading && (
+        <p style={{ marginTop: 15, color: "red" }}>
+          Processing… please wait
+        </p>
+      )}
     </div>
   );
 };
