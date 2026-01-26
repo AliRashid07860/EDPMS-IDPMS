@@ -1,0 +1,74 @@
+.section {
+  background: #fff;
+  max-width: 440px;
+  margin: 32px auto;
+  border-radius: 14px;
+  box-shadow: 0 2px 16px #c8d0ff22;
+  padding: 30px 26px 22px 26px;
+  display: flex;
+  flex-direction: column;
+}
+.section-header {
+  font-size: 1.17em;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section small {
+  color: #5c6c85;
+  font-size: 0.97em;
+  margin-bottom: 13px;
+}
+.file-label {
+  display: inline-block;
+  background: #f2f7fd;
+  border: 2px dashed #aac9f2;
+  color: #1865c5;
+  padding: 11px 14px;
+  font-size: 1em;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-bottom: 9px;
+  transition: background 0.2s, border 0.2s;
+}
+.file-label:hover {
+  background: #e9f3ff;
+  border-color: #2563eb;
+}
+input[type="file"] {
+  display: none;
+}
+.loading {
+  margin: 12px 0;
+  color: #d97706;
+  font-size: 1.02em;
+  background: #fff9e6;
+  padding: 7px 16px;
+  border-radius: 7px;
+}
+.file-list {
+  margin: 12px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+.file-list li {
+  background: #f7fafc;
+  border-radius: 5px;
+  padding: 6px 12px;
+  color: #21273c;
+  font-size: 0.99em;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-list .success {
+  color: #1ba671;
+}
+.file-list .error {
+  color: #e53e3e;
+}
