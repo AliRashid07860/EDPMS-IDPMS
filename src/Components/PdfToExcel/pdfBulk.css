@@ -1,0 +1,46 @@
+.section {
+  max-width: 760px;
+  margin: 24px auto;
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.section-header {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #111827;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.file-label input[type="file"] {
+  display: none;
+}
+
+.loading {
+  margin-top: 12px;
+}
+
+.file-list {
+  margin-top: 12px;
+  padding-left: 16px;
+}
+
+.file-list li {
+  margin: 4px 0;
+}
+
+.file-list li.success { color: #059669; }
+.file-list li.error { color: #dc2626; }
