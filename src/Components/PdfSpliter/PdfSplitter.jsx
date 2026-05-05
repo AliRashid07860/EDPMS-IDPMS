@@ -37,7 +37,11 @@ function PdfSplitter() {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const text = await getTextFromPage(pdf, i);
+<<<<<<< HEAD
           if (text.includes("CSBV_DEL_202"|| "CSBV_DEL_2022-2023"|| "CSBV_DEL_2023-2024" || "CSBV_DEL_2024-2025" || "CSBV_DEL_2025-2026" || "CSBV_DEL_2025-2026" || "CSBV_DEL_2026-2027")) {
+=======
+          if (text.includes("CSBV_DEL_2025-2026" || "CSBV_DEL_2025-2026")) {
+>>>>>>> 4f10b7f8bc0dab7c18657e4648e99b31e4f0d641
             startIndexes.push(i - 1);
           }
         }
