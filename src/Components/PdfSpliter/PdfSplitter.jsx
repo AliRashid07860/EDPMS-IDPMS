@@ -37,11 +37,16 @@ function PdfSplitter() {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const text = await getTextFromPage(pdf, i);
-<<<<<<< HEAD
-          if (text.includes("CSBV_DEL_202"|| "CSBV_DEL_2022-2023"|| "CSBV_DEL_2023-2024" || "CSBV_DEL_2024-2025" || "CSBV_DEL_2025-2026" || "CSBV_DEL_2025-2026" || "CSBV_DEL_2026-2027")) {
-=======
-          if (text.includes("CSBV_DEL_2025-2026" || "CSBV_DEL_2025-2026")) {
->>>>>>> 4f10b7f8bc0dab7c18657e4648e99b31e4f0d641
+
+          if (
+            text.includes("CSBV_DEL_202") ||
+            text.includes("CSBV_DEL_2022-2023") ||
+            text.includes("CSBV_DEL_2023-2024") ||
+            text.includes("CSBV_DEL_2024-2025") ||
+            text.includes("CSBV_DEL_2025-2026") ||
+            text.includes("CSBV_DEL_2026-2027")
+          ) {
+
             startIndexes.push(i - 1);
           }
         }
@@ -109,7 +114,7 @@ function PdfSplitter() {
         Bulk PDF Split & Download
       </h2>
       <small>Upload multiple PDFs, split Shipping bills, and download as ZIP.</small>
-      
+
       <label className="file-label">
         Select PDFs
         <input type="file" accept="application/pdf" multiple onChange={handleFileChange} disabled={processing} />
@@ -121,8 +126,8 @@ function PdfSplitter() {
         <ul className="file-list">
           {results.map((res, i) => (
             <li key={i} className={res.status}>
-              {res.file} ➡️ {res.status === "success" 
-                ? `${res.splitCount} parts created` 
+              {res.file} ➡️ {res.status === "success"
+                ? `${res.splitCount} parts created`
                 : "No matches found"}
             </li>
           ))}

@@ -102,11 +102,7 @@ function PdfToExcel() {
 
         // FOB Value
         const FOBValueMatch = fullText.match(/FOB\s*Value\s*\(In\s*Foreign\s*Cur[\s-]*rency\)\s*:\s*([0-9]+(?:\.[0-9]+)?)/i);
-<<<<<<< HEAD
         const FOBValueForeign = FOBValueMatch ? FOBValueMatch[1] : "";
-=======
-        const FOBValueForeign = FOBValueMatch ? FOBValueMatch[1] : "";  
->>>>>>> 4f10b7f8bc0dab7c18657e4648e99b31e4f0d641
 
         // FOB Currency
         const FOBCurrencyMatch =
@@ -145,14 +141,11 @@ function PdfToExcel() {
         // Quantity
         const Quantity = sumQuantities(fullText);
 
-<<<<<<< HEAD
         //NFEI
         // NFEI
         const NfeiMatch = fullText.match(/NFEI\s*:\s*(YES|NO)/i);
         const Nfei = NfeiMatch ? NfeiMatch[1] : "";
 
-=======
->>>>>>> 4f10b7f8bc0dab7c18657e4648e99b31e4f0d641
         const row = {
           CSBNumber,
           FillingDate,
@@ -168,10 +161,7 @@ function PdfToExcel() {
           CourierName,
           Quantity,
           ADCode,
-<<<<<<< HEAD
           Nfei,
-=======
->>>>>>> 4f10b7f8bc0dab7c18657e4648e99b31e4f0d641
         };
 
         rows.push(row);
@@ -201,10 +191,7 @@ function PdfToExcel() {
         "CourierName",
         "Quantity",
         "ADCode",
-<<<<<<< HEAD
         "Nfei",
-=======
->>>>>>> 4f10b7f8bc0dab7c18657e4648e99b31e4f0d641
       ];
 
       const worksheetData = [
