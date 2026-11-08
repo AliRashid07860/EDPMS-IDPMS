@@ -1,0 +1,160 @@
+/* Whole page background and padding */
+.app-container {
+  background: #f7f9fa;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Center section for PdfRename */
+.top-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+/* Grid layout for 4 cards */
+.grid-section {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 4 equal columns */
+  gap: 20px;
+}
+
+/* Each box wrapper styling */
+.grid-item {
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  padding: 20px;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .grid-section {
+    grid-template-columns: repeat(2, 1fr); /* 2 columns on tablets */
+  }
+}
+@media (max-width: 600px) {
+  .grid-section {
+    grid-template-columns: repeat(1, 1fr); /* 1 column on mobile */
+  }
+}
+.grid-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 equal boxes */
+  gap: 20px;
+}
+
+.dhl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* space between DhlInvoice and DhlAwb */
+}
+
+.dhl-group hr {
+  border: 0;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.dhlBack{
+  background-image: url('https://www.pngitem.com/pimgs/m/78-785160_magazine-article-dhl-png-logo-dhl-png-logo.png');
+   background-repeat: no-repeat, repeat;
+   height: 500px;
+   width: 50px;
+   
+}
+.logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin-right: 10px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(60,72,100,.08);
+  padding: 18px 30px;
+  border-radius: 12px;
+  margin: 26px 36px 25px 36px;
+}
+
+.header-logo .main-logo {
+  height: 48px;
+  width: 48px;
+  object-fit: contain;
+}
+
+.header-title {
+  flex: 1;
+  text-align: center;
+  font-weight: 900;
+  font-size: 2rem;
+  letter-spacing: 1px;
+  color: #283593;
+}
+
+.your-name {
+  color: #15bfbf;
+  font-weight: 700;
+}
+
+.header-avatar .avatar {
+  height: 44px;
+  width: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e0e0e0;
+}
+
+
+  .header-title {
+    font-size: 1.1rem;
+  }
+  .header-logo .main-logo {
+    height: 36px;
+    width: 36px;
+  }
+
+
+.header-avatar {
+  display: flex;
+  align-items: center;
+  gap: 10px;                
+}
+
+.avatar-name {
+  font-weight: 600;
+  font-size: 1.07rem;
+  margin-right: 5px;
+  color: #375889;
+  letter-spacing: 0.2px;
+}
+
+.header-avatar .avatar {
+  height: 44px;
+  width: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e0e0e0;
+  background: #fff;
+  box-shadow: 0 0 4px #e3e3e3;
+}
+@media (max-width: 650px) {
+  .header-avatar .avatar {
+    height: 32px;
+    width: 32px;
+  }
+  .avatar-name {
+    font-size: 0.95rem;
+  }
+}
+
+

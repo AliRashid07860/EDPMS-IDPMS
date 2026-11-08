@@ -1,0 +1,78 @@
+/* Container styling */
+.fedex-section {
+  background: #ffffff;
+  max-width: 480px;
+  margin: 32px auto;
+  padding: 28px 24px;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+/* Heading */
+.fedex-section h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px 0;
+}
+
+/* Small instructions */
+.fedex-section small,
+.fedex-section ul {
+  color: #475569;
+  font-size: 0.95rem;
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* File input label as button */
+.file-label {
+  display: inline-block;
+  padding: 12px 18px;
+  background: #f1f5f9;
+  border: 2px dashed #93c5fd;
+  border-radius: 8px;
+  color: #2563eb;
+  font-weight: 500;
+  margin-top: 14px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.file-label:hover {
+  background: #e0f2fe;
+  border-color: #3b82f6;
+}
+
+/* Hide actual input field */
+.file-label input[type="file"] {
+  display: none;
+}
+
+/* Loading text */
+.loading {
+  margin-top: 14px;
+  padding: 8px 14px;
+  background: #fff8e1;
+  color: #92400e;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+/* Uploaded file info list (optional) */
+.fedex-file-list {
+  margin-top: 16px;
+  list-style: none;
+  padding: 0;
+}
+.fedex-file-list li {
+  background: #f8fafc;
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
