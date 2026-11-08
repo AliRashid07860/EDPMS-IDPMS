@@ -9,6 +9,8 @@ import DhlAwb from '../Dhl/DhlAwb';
 import AremexInvoices from "../Aremax/AremexInvoices";
 import AramexAwb from "../Aremax/AramexAwb";
 import CheckWithExcel from '../CreateFolder/CheckWithExcel';
+import IDPMS from '../IDPMS/IDPMS';
+
 
 function Main() {
   return (
@@ -44,6 +46,8 @@ function Main() {
           <img src='https://ik.imagekit.io/8o8zh778p/smiley-face-png-35.jpg?updatedAt=1755426533168' alt="avatar" className="avatar" />
         </div> */}
       </header>
+       
+       <IDPMS/>
 
       {/* Row 1 => PdfRename at center */}
       <div className="top-section">
