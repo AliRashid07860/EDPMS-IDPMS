@@ -11,10 +11,10 @@ function clean(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
-function toNumber(value) {
-  const n = Number(String(value ?? "").replace(/,/g, "").replace(/[^\d.-]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
+// function toNumber(value) {
+//   const n = Number(String(value ?? "").replace(/,/g, "").replace(/[^\d.-]/g, ""));
+//   return Number.isFinite(n) ? n : 0;
+// }
 
 function parseAmountToken(value) {
   const m = String(value ?? "").replace(/,/g, "").match(/^-?\d+(?:\.\d+)?$/);
