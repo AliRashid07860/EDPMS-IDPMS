@@ -10,6 +10,7 @@ import AremexInvoices from "../Aremax/AremexInvoices";
 import AramexAwb from "../Aremax/AramexAwb";
 import CheckWithExcel from '../CreateFolder/CheckWithExcel';
 import IDPMS from '../IDPMS/IDPMS';
+import ZipMain from '../ZipFile/ZipMain';
 
 
 function Main() {
@@ -48,6 +49,7 @@ function Main() {
       </header>
        
        <IDPMS/>
+       <ZipMain/>
 
       {/* Row 1 => PdfRename at center */}
       <div className="top-section">
