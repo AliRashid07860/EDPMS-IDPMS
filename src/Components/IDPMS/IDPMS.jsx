@@ -1,350 +1,133 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { extractCustomsData } from "./pdfParser";
 
+//const DUTY_FIELDS = ["BCD", "SWS", "ADD", "INT", "FINE", "CHCESS", "IGST"];
 
-function IDPMS() {
+const isBlank = (value) => value === "" || value === null || value === undefined;
+const toNumberOrBlank = (value) => {
+  if (isBlank(value)) return "";
+  const number = Number(value);
+  return Number.isFinite(number) ? number : "";
+};
+
+// Return blank if any component needed for the total is missing.
+// Missing source data must not be treated as zero.
+function sumOnlyWhenComplete(values) {
+  if (values.some(isBlank)) return "";
+  return values.reduce((sum, value) => sum + Number(value), 0);
+}
+
+export default function IDPMS() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [processedData, setProcessedData] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState("");
-
+  const [errors, setErrors] = useState([]);
   const fileInputRef = useRef(null);
 
-  // =====================================================
-  // OPEN FILE BROWSER
-  // =====================================================
+  const addFiles = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    const pdfs = incoming.filter((file) =>
+      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    );
 
-  const handleBoxClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // =====================================================
-  // ADD PDF FILES
-  // =====================================================
-
-  const handleFiles = (files) => {
-    if (!files) return;
-
-    const fileArray = Array.from(files);
-
-    const pdfFiles = fileArray.filter((file) => {
-      return (
-        file.type === "application/pdf" ||
-        file.name.toLowerCase().endsWith(".pdf")
-      );
-    });
-
-    if (pdfFiles.length === 0) {
-      alert("Please select PDF files only.");
+    if (!pdfs.length) {
+      setMessage("Please select PDF files only.");
       return;
     }
 
-    setSelectedFiles((prevFiles) => {
-      const existingNames = new Set(
-        prevFiles.map((file) => file.name)
-      );
-
-      const newFiles = pdfFiles.filter(
-        (file) => !existingNames.has(file.name)
-      );
-
-      return [...prevFiles, ...newFiles];
+    setSelectedFiles((previous) => {
+      const existing = new Set(previous.map((file) => `${file.name}-${file.size}`));
+      const additions = pdfs.filter((file) => !existing.has(`${file.name}-${file.size}`));
+      return [...previous, ...additions];
     });
-
-    setMessage("");
-  };
-
-  // =====================================================
-  // FILE INPUT CHANGE
-  // =====================================================
-
-  const handleFileInputChange = (e) => {
-    e.preventDefault();
-
-    if (
-      e.target.files &&
-      e.target.files.length > 0
-    ) {
-      handleFiles(e.target.files);
-    }
-
-    // Same PDF ko dobara select karne ke liye
-    e.target.value = "";
-  };
-
-  // =====================================================
-  // DRAG OVER
-  // =====================================================
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsDragging(true);
-  };
-
-  // =====================================================
-  // DRAG LEAVE
-  // =====================================================
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsDragging(false);
-  };
-
-  // =====================================================
-  // DROP
-  // =====================================================
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    setIsDragging(false);
-
-    if (
-      e.dataTransfer.files &&
-      e.dataTransfer.files.length > 0
-    ) {
-      handleFiles(e.dataTransfer.files);
-    }
-  };
-
-  // =====================================================
-  // REMOVE ONE FILE
-  // =====================================================
-
-  const handleRemoveFile = (index, e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    setSelectedFiles((prevFiles) =>
-      prevFiles.filter((_, i) => i !== index)
-    );
-
-    // Agar processing result tha to clear kar do
     setProcessedData([]);
+    setErrors([]);
     setMessage("");
   };
 
-  // =====================================================
-  // CLEAR ALL FILES
-  // =====================================================
+  const handleInputChange = (event) => {
+    addFiles(event.target.files);
+    event.target.value = "";
+  };
 
-  const handleClearAll = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setIsDragging(false);
+    addFiles(event.dataTransfer.files);
+  };
 
+  const removeFile = (index) => {
+    setSelectedFiles((previous) => previous.filter((_, i) => i !== index));
+    setProcessedData([]);
+    setErrors([]);
+    setMessage("");
+  };
+
+  const clearAll = () => {
     setSelectedFiles([]);
     setProcessedData([]);
+    setErrors([]);
     setMessage("");
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // =====================================================
-  // PROCESS PDFS
-  // =====================================================
-
-  const handleProcessPDFs = async (e) => {
-    // IMPORTANT:
-    // Agar parent component <form> hai
-    // to page submit nahi hoga.
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    console.log(
-      "===================================="
-    );
-
-    console.log(
-      "PROCESS PDF BUTTON CLICKED"
-    );
-
-    console.log(
-      "Selected Files:",
-      selectedFiles
-    );
-
-    console.log(
-      "===================================="
-    );
-
-    if (selectedFiles.length === 0) {
-      alert("Please upload at least one PDF.");
-      return;
-    }
+  const processPdfs = async () => {
+    if (!selectedFiles.length || isProcessing) return;
 
     setIsProcessing(true);
     setProcessedData([]);
-    setMessage(
-      `Processing ${selectedFiles.length} PDF(s)...`
-    );
+    setErrors([]);
+    setMessage(`Processing ${selectedFiles.length} PDF(s)...`);
 
-    try {
-      const allRows = [];
+    const allRows = [];
+    const failedFiles = [];
 
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
+    for (let index = 0; index < selectedFiles.length; index += 1) {
+      const file = selectedFiles[index];
+      setMessage(`Processing ${index + 1}/${selectedFiles.length}: ${file.name}`);
 
-        console.log(
-          `Processing PDF ${i + 1}/${selectedFiles.length}:`,
-          file.name
-        );
-
-        setMessage(
-          `Processing ${i + 1}/${selectedFiles.length}: ${file.name}`
-        );
-
-        try {
-          const rows =
-            await extractCustomsData(file);
-
-          console.log(
-            "Extracted data:",
-            rows
-          );
-
-          if (
-            rows &&
-            Array.isArray(rows) &&
-            rows.length > 0
-          ) {
-            allRows.push(...rows);
-          } else {
-            console.warn(
-              `No invoice data found in ${file.name}`
-            );
-          }
-        } catch (fileError) {
-          console.error(
-            `Error processing ${file.name}:`,
-            fileError
-          );
-
-          // Ek PDF fail hone par baaki PDFs process hongi
-          allRows.push({
-            BE_No: "",
-            BE_Date: "",
-            HAWB_Number: "",
-            HAWB_Date: "",
-            Supplier_Name: "",
-            Invoice_No: "",
-            Invoice_Amount: "",
-            Currency: "",
-            BCD: 0,
-            SWS: 0,
-            ADD: 0,
-            INT: 0,
-            FINE: 0,
-            CHCESS: 0,
-            IGST: 0,
-            Customs_Components: "",
-            Freight_Amount: "",
-            Freight_Currency: "",
-            Icegate_Ack: "",
-            Payment_Ref: "",
-            Payment_Request_Date: "",
-            Actual_Payment_Date: "",
-            Category: "",
-            Sub_Category: "",
-            User: "",
-            Notes: `ERROR: ${file.name} - ${fileError.message}`,
-          });
+      try {
+        const rows = await extractCustomsData(file);
+        if (!Array.isArray(rows) || !rows.length) {
+          throw new Error("No invoice rows were extracted.");
         }
+        allRows.push(...rows);
+      } catch (error) {
+        console.error(`Failed to process ${file.name}`, error);
+        failedFiles.push(`${file.name}: ${error.message}`);
       }
-
-      console.log(
-        "===================================="
-      );
-
-      console.log(
-        "FINAL PROCESSED DATA:",
-        allRows
-      );
-
-      console.log(
-        "===================================="
-      );
-
-      setProcessedData(allRows);
-
-      if (allRows.length === 0) {
-        setMessage(
-          "No invoice data found. Open browser Console (F12) to check PDF extraction."
-        );
-      } else {
-        setMessage(
-          `Success! ${allRows.length} invoice row(s) processed.`
-        );
-      }
-    } catch (error) {
-      console.error(
-        "===================================="
-      );
-
-      console.error(
-        "PDF PROCESSING ERROR:",
-        error
-      );
-
-      console.error(
-        "===================================="
-      );
-
-      setMessage(
-        `Error: ${error.message}`
-      );
-    } finally {
-      setIsProcessing(false);
     }
+
+    setProcessedData(allRows);
+    setErrors(failedFiles);
+
+    if (allRows.length && failedFiles.length) {
+      setMessage(`${allRows.length} invoice row(s) extracted. ${failedFiles.length} PDF(s) failed; see errors below.`);
+    } else if (allRows.length) {
+      setMessage(`${allRows.length} invoice row(s) extracted. Please review blank fields before using the Excel file.`);
+    } else {
+      setMessage("No invoice rows could be extracted. See the error details below.");
+    }
+
+    setIsProcessing(false);
   };
 
-  // =====================================================
-  // DOWNLOAD EXCEL
-  // =====================================================
-
-  const handleDownloadExcel = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    if (!processedData || processedData.length === 0) {
-      alert("Please click Process PDFs first.");
+  const downloadExcel = () => {
+    if (!processedData.length) {
+      setMessage("Process at least one PDF before downloading.");
       return;
     }
 
-    // Customs duty excludes IGST. Total includes IGST.
-    const getDutyTotal = (row) =>
-      ["BCD", "SWS", "ADD", "INT", "FINE", "CHCESS"].reduce(
-        (sum, key) => sum + (Number(row[key]) || 0),
-        0
+    const excelRows = processedData.map((row) => {
+      const customs = sumOnlyWhenComplete(
+        ["BCD", "SWS", "ADD", "INT", "FINE", "CHCESS"].map((key) => row[key])
       );
-
-    const getNumber = (value) => Number(value) || 0;
-
-    // Main Excel sheet: one row per invoice.
-    const worksheetData = processedData.map((row) => {
-      const totalCustoms = getDutyTotal(row);
-      const igst = getNumber(row.IGST);
+      const total = isBlank(customs) || isBlank(row.IGST)
+        ? ""
+        : Number(customs) + Number(row.IGST);
 
       return {
         BE_No: row.BE_No || "",
@@ -353,19 +136,19 @@ function IDPMS() {
         "HAWB Date": row.HAWB_Date || "",
         "Supplier's Name": row.Supplier_Name || "",
         "Invoice No.": row.Invoice_No || "",
-        "Invoice Amount": row.Invoice_Amount ?? "",
+        "Invoice Amount": toNumberOrBlank(row.Invoice_Amount),
         Currency: row.Currency || "",
-        BCD: row.BCD === "" ? "" : getNumber(row.BCD),
-        SWS: row.SWS === "" ? "" : getNumber(row.SWS),
-        ADD: row.ADD === "" ? "" : getNumber(row.ADD),
-        INT: row.INT === "" ? "" : getNumber(row.INT),
-        FINE: row.FINE === "" ? "" : getNumber(row.FINE),
-        CHCESS: row.CHCESS === "" ? "" : getNumber(row.CHCESS),
-        IGST: row.IGST === "" ? "" : igst,
-        "Total Customs": totalCustoms,
-        Total: totalCustoms + igst,
+        BCD: toNumberOrBlank(row.BCD),
+        SWS: toNumberOrBlank(row.SWS),
+        ADD: toNumberOrBlank(row.ADD),
+        INT: toNumberOrBlank(row.INT),
+        FINE: toNumberOrBlank(row.FINE),
+        CHCESS: toNumberOrBlank(row.CHCESS),
+        IGST: toNumberOrBlank(row.IGST),
+        "Total Customs": customs,
+        Total: total,
         "Customs Components": row.Customs_Components || "",
-        "Freight Amount": row.Freight_Amount ?? "",
+        "Freight Amount": toNumberOrBlank(row.Freight_Amount),
         "Freight Currency": row.Freight_Currency || "",
         "Icegate Ack Number.": row.Icegate_Ack || "",
         "Payment ref no.": row.Payment_Ref || "",
@@ -378,718 +161,151 @@ function IDPMS() {
       };
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    // Keep numeric values numeric, but display them in Indian-style grouped decimals.
-    const formattedColumns = [
-      "Invoice Amount", "BCD", "SWS", "ADD", "INT", "FINE", "CHCESS",
-      "IGST", "Total Customs", "Total", "Freight Amount",
-    ];
-    formattedColumns.forEach((heading) => {
-      const columnIndex = worksheetData.length ? Object.keys(worksheetData[0]).indexOf(heading) : -1;
-      if (columnIndex < 0) return;
-      for (let rowIndex = 1; rowIndex <= worksheetData.length; rowIndex += 1) {
-        const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
-        if (worksheet[cellAddress] && typeof worksheet[cellAddress].v === "number") {
-          worksheet[cellAddress].z = "#,##,##0.00";
-        }
-      }
-    });
+    const mainSheet = XLSX.utils.json_to_sheet(excelRows);
+    mainSheet["!cols"] = Object.keys(excelRows[0]).map((heading) => ({
+      wch: Math.min(Math.max(heading.length + 3, 14), 42),
+    }));
 
-    worksheet["!cols"] = [
-      { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 14 },
-      { wch: 42 }, { wch: 25 }, { wch: 18 }, { wch: 12 },
-      { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-      { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 },
-      { wch: 18 }, { wch: 40 }, { wch: 18 }, { wch: 18 },
-      { wch: 24 }, { wch: 20 }, { wch: 22 }, { wch: 22 },
-      { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 45 },
-    ];
-
-    // Summary: count each Bill of Entry only once, even if it has
-    // multiple invoice rows and the duty values are repeated by the parser.
-    const beTotals = new Map();
-
-    processedData.forEach((row, index) => {
-      const beKey = String(row.BE_No || `UNKNOWN_${index}`);
-      if (!beTotals.has(beKey)) {
-        beTotals.set(beKey, {
-          customs: getDutyTotal(row),
-          igst: getNumber(row.IGST),
-        });
-      } else {
-        const existing = beTotals.get(beKey);
-        // Keep the larger recorded amount, rather than double-counting
-        // the same BE duties on each invoice line.
-        existing.customs = Math.max(existing.customs, getDutyTotal(row));
-        existing.igst = Math.max(existing.igst, getNumber(row.IGST));
-      }
-    });
-
-    const summaryCustoms = Array.from(beTotals.values()).reduce(
-      (sum, item) => sum + item.customs,
-      0
-    );
-    const summaryIGST = Array.from(beTotals.values()).reduce(
-      (sum, item) => sum + item.igst,
-      0
-    );
-
-    const summarySheet = XLSX.utils.json_to_sheet([
-      {
-        "Total PDFs": selectedFiles.length,
-        "Total Invoice Rows": processedData.length,
-        "Total Bill of Entries": beTotals.size,
-        "Total Customs (excluding IGST)": summaryCustoms,
-        "Total IGST": summaryIGST,
-        "Total Including IGST": summaryCustoms + summaryIGST,
-      },
-    ]);
-    summarySheet["!cols"] = [
-      { wch: 18 }, { wch: 22 }, { wch: 22 },
-      { wch: 32 }, { wch: 18 }, { wch: 25 },
-    ];
+    const summary = [{
+      "Total PDFs Selected": selectedFiles.length,
+      "Total Invoice Rows": processedData.length,
+      "PDF Processing Errors": errors.length,
+      "Rows With Missing Invoice Amount": processedData.filter((row) => isBlank(row.Invoice_Amount)).length,
+      "Rows With Missing Currency": processedData.filter((row) => isBlank(row.Currency)).length,
+      "Rows Requiring Review": processedData.filter((row) => /Review required:/i.test(row.Notes || "")).length,
+      "Note": "Totals are left blank when any required source amount is missing. No missing value is assumed to be zero.",
+    }];
+    const summarySheet = XLSX.utils.json_to_sheet(summary);
+    summarySheet["!cols"] = Object.keys(summary[0]).map((heading) => ({ wch: Math.max(20, heading.length + 3) }));
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "October");
-    XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary - October");
-
+    XLSX.utils.book_append_sheet(workbook, mainSheet, "Customs Data");
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
     XLSX.writeFile(workbook, "Customs_Payment_Tracker.xlsx");
-    setMessage("Excel downloaded successfully.");
+    setMessage("Excel file downloaded. Please review Notes and blank fields.");
   };
 
-  // =====================================================
-  // UI
-  // =====================================================
+  const cellStyle = {
+    padding: "9px 10px",
+    borderBottom: "1px solid #e2e8f0",
+    textAlign: "left",
+    whiteSpace: "nowrap",
+  };
 
   return (
-    <div
-      style={{
-        maxWidth: "900px",
-        margin: "40px auto",
-        padding: "0 20px",
-        fontFamily:
-          "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          padding: "30px",
-          border:
-            "1px solid #e2e8f0",
-          borderRadius: "12px",
-          background: "#fff",
-          boxShadow:
-            "0 4px 15px rgba(0,0,0,0.08)",
-        }}
-      >
-        {/* =================================================
-            HEADER
-        ================================================= */}
-
-        <h2
-          style={{
-            margin:
-              "0 0 6px 0",
-            fontSize: "24px",
-            color: "#0f172a",
-          }}
-        >
-          Customs PDF → Excel
-        </h2>
-
-        <p
-          style={{
-            margin:
-              "0 0 20px 0",
-            color: "#64748b",
-            fontSize: "14px",
-          }}
-        >
-          Multiple Customs PDFs upload
-          karo aur Excel automatically
-          ready karo.
+    <main style={{ maxWidth: 1100, margin: "36px auto", padding: "0 18px", fontFamily: "Arial, sans-serif", color: "#0f172a" }}>
+      <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 26, boxShadow: "0 8px 28px rgba(15,23,42,.06)" }}>
+        <h2 style={{ margin: 0, fontSize: 25 }}>Customs PDF to Excel</h2>
+        <p style={{ color: "#64748b", margin: "8px 0 22px" }}>
+          Multiple customs PDFs select ya drag-and-drop karein, phir invoice data process karke Excel export karein.
         </p>
 
-        {/* =================================================
-            HIDDEN INPUT
-        ================================================= */}
-
         <input
-          type="file"
           ref={fileInputRef}
-          onChange={
-            handleFileInputChange
-          }
-          multiple
+          type="file"
           accept=".pdf,application/pdf"
-          style={{
-            display: "none",
-          }}
+          multiple
+          onChange={handleInputChange}
+          style={{ display: "none" }}
         />
 
-        {/* =================================================
-            DRAG & DROP
-        ================================================= */}
-
         <div
-          onClick={handleBoxClick}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") fileInputRef.current?.click();
+          }}
+          onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(event) => { event.preventDefault(); setIsDragging(false); }}
           onDrop={handleDrop}
           style={{
-            border: isDragging
-              ? "2px dashed #0284c7"
-              : "1.5px dashed #cbd5e1",
-
-            borderRadius: "10px",
-
-            padding:
-              "45px 20px",
-
+            border: `2px dashed ${isDragging ? "#0284c7" : "#cbd5e1"}`,
+            borderRadius: 12,
+            padding: "42px 18px",
             textAlign: "center",
-
             cursor: "pointer",
-
-            backgroundColor:
-              isDragging
-                ? "#f0f9ff"
-                : "#f8fafc",
-
-            transition:
-              "all 0.2s ease",
+            background: isDragging ? "#f0f9ff" : "#f8fafc",
           }}
         >
-          <div
-            style={{
-              color: "#334155",
-              fontWeight: "600",
-              fontSize: "16px",
-            }}
-          >
-            {isDragging
-              ? "📂 Drop PDF files here..."
-              : "📄 Drag & Drop PDF files here or click to browse"}
+          <div style={{ fontSize: 17, fontWeight: 700 }}>
+            {isDragging ? "Drop PDF files here" : "Drag & drop PDF files here"}
           </div>
-
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#94a3b8",
-              marginTop: "8px",
-              display:
-                "inline-block",
-            }}
-          >
-            Multiple PDFs supported
-          </span>
+          <div style={{ color: "#64748b", fontSize: 13, marginTop: 8 }}>or click to browse · Multiple PDFs supported</div>
         </div>
 
-        {/* =================================================
-            SELECTED FILES
-        ================================================= */}
-
-        {selectedFiles.length >
-          0 && (
-          <div
-            style={{
-              marginTop: "20px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent:
-                  "space-between",
-                alignItems:
-                  "center",
-                marginBottom:
-                  "10px",
-              }}
-            >
-              <h4
-                style={{
-                  margin: 0,
-                  color:
-                    "#334155",
-                  fontSize:
-                    "14px",
-                }}
-              >
-                Selected Files (
-                {
-                  selectedFiles.length
-                }
-                )
-              </h4>
-
-              <button
-                type="button"
-                onClick={
-                  handleClearAll
-                }
-                style={{
-                  border:
-                    "none",
-                  background:
-                    "transparent",
-                  color:
-                    "#ef4444",
-                  cursor:
-                    "pointer",
-                  fontSize:
-                    "12px",
-                  fontWeight:
-                    "600",
-                }}
-              >
-                Clear All
-              </button>
+        {selectedFiles.length > 0 && (
+          <section style={{ marginTop: 22 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <strong>Selected PDFs ({selectedFiles.length})</strong>
+              <button type="button" onClick={clearAll} style={secondaryButton}>Clear all</button>
             </div>
-
-            <div
-              style={{
-                maxHeight:
-                  "180px",
-                overflowY:
-                  "auto",
-                border:
-                  "1px solid #e2e8f0",
-                borderRadius:
-                  "6px",
-                padding:
-                  "8px",
-              }}
-            >
-              {selectedFiles.map(
-                (file, idx) => (
-                  <div
-                    key={`${file.name}-${idx}`}
-                    style={{
-                      display:
-                        "flex",
-                      justifyContent:
-                        "space-between",
-                      alignItems:
-                        "center",
-                      padding:
-                        "8px 10px",
-                      background:
-                        idx % 2 ===
-                        0
-                          ? "#f8fafc"
-                          : "#fff",
-                      borderRadius:
-                        "4px",
-                      fontSize:
-                        "13px",
-                      marginBottom:
-                        "2px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        color:
-                          "#0f172a",
-                        overflow:
-                          "hidden",
-                        textOverflow:
-                          "ellipsis",
-                        whiteSpace:
-                          "nowrap",
-                        maxWidth:
-                          "90%",
-                      }}
-                    >
-                      📄{" "}
-                      {file.name}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={(e) =>
-                        handleRemoveFile(
-                          idx,
-                          e
-                        )
-                      }
-                      style={{
-                        border:
-                          "none",
-                        background:
-                          "none",
-                        color:
-                          "#ef4444",
-                        cursor:
-                          "pointer",
-                        fontWeight:
-                          "bold",
-                        fontSize:
-                          "15px",
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )
-              )}
+            <div style={{ marginTop: 10, border: "1px solid #e2e8f0", borderRadius: 8, maxHeight: 190, overflowY: "auto" }}>
+              {selectedFiles.map((file, index) => (
+                <div key={`${file.name}-${file.size}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13 }}>📄 {file.name}</span>
+                  <button type="button" onClick={() => removeFile(index)} aria-label={`Remove ${file.name}`} style={{ ...secondaryButton, color: "#dc2626" }}>Remove</button>
+                </div>
+              ))}
             </div>
+          </section>
+        )}
+
+        {message && <div role="status" style={{ marginTop: 18, padding: 12, borderRadius: 8, background: "#f1f5f9", color: "#334155", fontSize: 13 }}>{message}</div>}
+
+        {errors.length > 0 && (
+          <div style={{ marginTop: 14, padding: 14, borderRadius: 8, background: "#fef2f2", color: "#991b1b" }}>
+            <strong>PDF errors</strong>
+            <ul style={{ marginBottom: 0 }}>
+              {errors.map((error) => <li key={error}>{error}</li>)}
+            </ul>
           </div>
         )}
 
-        {/* =================================================
-            STATUS MESSAGE
-        ================================================= */}
-
-        {message && (
-          <div
-            style={{
-              marginTop:
-                "18px",
-              padding:
-                "12px",
-              borderRadius:
-                "7px",
-
-              background:
-                message
-                  .toLowerCase()
-                  .includes(
-                    "error"
-                  )
-                  ? "#fef2f2"
-                  : "#f0fdf4",
-
-              color:
-                message
-                  .toLowerCase()
-                  .includes(
-                    "error"
-                  )
-                  ? "#b91c1c"
-                  : "#166534",
-
-              fontSize:
-                "13px",
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        {/* =================================================
-            BUTTONS
-        ================================================= */}
-
-        <div
-          style={{
-            marginTop:
-              "24px",
-            display:
-              "flex",
-            gap: "12px",
-            flexWrap:
-              "wrap",
-          }}
-        >
-          {/* PROCESS PDF */}
-
-          <button
-            type="button"
-            onClick={
-              handleProcessPDFs
-            }
-            disabled={
-              selectedFiles.length ===
-                0 ||
-              isProcessing
-            }
-            style={{
-              backgroundColor:
-                selectedFiles.length ===
-                  0 ||
-                isProcessing
-                  ? "#94a3b8"
-                  : "#0284c7",
-
-              color: "#fff",
-
-              border: "none",
-
-              padding:
-                "11px 22px",
-
-              borderRadius:
-                "6px",
-
-              cursor:
-                selectedFiles.length ===
-                  0 ||
-                isProcessing
-                  ? "not-allowed"
-                  : "pointer",
-
-              fontWeight:
-                "600",
-
-              minWidth:
-                "130px",
-            }}
-          >
-            {isProcessing
-              ? "Processing..."
-              : "Process PDFs"}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 22 }}>
+          <button type="button" disabled={!selectedFiles.length || isProcessing} onClick={processPdfs} style={{ ...primaryButton, opacity: !selectedFiles.length || isProcessing ? 0.55 : 1 }}>
+            {isProcessing ? "Processing..." : "Process PDFs"}
           </button>
-
-          {/* DOWNLOAD EXCEL */}
-
-          <button
-            type="button"
-            onClick={
-              handleDownloadExcel
-            }
-            disabled={
-              processedData.length ===
-              0
-            }
-            style={{
-              backgroundColor:
-                processedData.length ===
-                0
-                  ? "#94a3b8"
-                  : "#16a34a",
-
-              color: "#fff",
-
-              border: "none",
-
-              padding:
-                "11px 22px",
-
-              borderRadius:
-                "6px",
-
-              cursor:
-                processedData.length ===
-                0
-                  ? "not-allowed"
-                  : "pointer",
-
-              fontWeight:
-                "600",
-
-              minWidth:
-                "130px",
-            }}
-          >
+          <button type="button" disabled={!processedData.length} onClick={downloadExcel} style={{ ...downloadButton, opacity: !processedData.length ? 0.55 : 1 }}>
             Download Excel
           </button>
         </div>
 
-        {/* =================================================
-            PREVIEW
-        ================================================= */}
-
-        {processedData.length >
-          0 && (
-          <div
-            style={{
-              marginTop:
-                "25px",
-              borderTop:
-                "1px solid #e2e8f0",
-              paddingTop:
-                "20px",
-            }}
-          >
-            <h4
-              style={{
-                margin:
-                  "0 0 10px 0",
-                color:
-                  "#334155",
-              }}
-            >
-              Processed Data Preview
-            </h4>
-
-            <div
-              style={{
-                overflowX:
-                  "auto",
-                border:
-                  "1px solid #e2e8f0",
-                borderRadius:
-                  "6px",
-              }}
-            >
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse:
-                    "collapse",
-                  fontSize:
-                    "12px",
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      background:
-                        "#f1f5f9",
-                    }}
-                  >
-                    <th
-                      style={{
-                        padding:
-                          "9px",
-                        textAlign:
-                          "left",
-                      }}
-                    >
-                      BE No
-                    </th>
-
-                    <th
-                      style={{
-                        padding:
-                          "9px",
-                        textAlign:
-                          "left",
-                      }}
-                    >
-                      Supplier
-                    </th>
-
-                    <th
-                      style={{
-                        padding:
-                          "9px",
-                        textAlign:
-                          "left",
-                      }}
-                    >
-                      Invoice
-                    </th>
-
-                    <th
-                      style={{
-                        padding:
-                          "9px",
-                        textAlign:
-                          "right",
-                      }}
-                    >
-                      Amount
-                    </th>
-
-                    <th
-                      style={{
-                        padding:
-                          "9px",
-                        textAlign:
-                          "left",
-                      }}
-                    >
-                      Currency
-                    </th>
-
-                    <th
-                      style={{
-                        padding:
-                          "9px",
-                        textAlign:
-                          "right",
-                      }}
-                    >
-                      IGST
-                    </th>
-                  </tr>
+        {processedData.length > 0 && (
+          <section style={{ marginTop: 28 }}>
+            <h3 style={{ fontSize: 17 }}>Extracted data preview ({processedData.length} rows)</h3>
+            <p style={{ color: "#64748b", fontSize: 12 }}>Blank cells mean the parser could not confidently identify that value in the PDF. Check Notes before using the data.</p>
+            <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+                <thead style={{ background: "#f1f5f9" }}>
+                  <tr>{["BE No", "Supplier", "Invoice No", "Amount", "Currency", "BCD", "SWS", "IGST", "Notes"].map((heading) => <th key={heading} style={cellStyle}>{heading}</th>)}</tr>
                 </thead>
-
                 <tbody>
-                  {processedData.map(
-                    (row, index) => (
-                      <tr
-                        key={index}
-                        style={{
-                          borderTop:
-                            "1px solid #e2e8f0",
-                        }}
-                      >
-                        <td
-                          style={{
-                            padding:
-                              "8px",
-                          }}
-                        >
-                          {row.BE_No ||
-                            "-"}
-                        </td>
-
-                        <td
-                          style={{
-                            padding:
-                              "8px",
-                          }}
-                        >
-                          {row.Supplier_Name ||
-                            "-"}
-                        </td>
-
-                        <td
-                          style={{
-                            padding:
-                              "8px",
-                          }}
-                        >
-                          {row.Invoice_No ||
-                            "-"}
-                        </td>
-
-                        <td
-                          style={{
-                            padding:
-                              "8px",
-                            textAlign:
-                              "right",
-                          }}
-                        >
-                          {row.Invoice_Amount ||
-                            "-"}
-                        </td>
-
-                        <td
-                          style={{
-                            padding:
-                              "8px",
-                          }}
-                        >
-                          {row.Currency ||
-                            "-"}
-                        </td>
-
-                        <td
-                          style={{
-                            padding:
-                              "8px",
-                            textAlign:
-                              "right",
-                          }}
-                        >
-                          {row.IGST ||
-                            0}
-                        </td>
-                      </tr>
-                    )
-                  )}
+                  {processedData.map((row, index) => (
+                    <tr key={`${row.BE_No}-${row.Invoice_No}-${index}`}>
+                      {[row.BE_No, row.Supplier_Name, row.Invoice_No, row.Invoice_Amount, row.Currency, row.BCD, row.SWS, row.IGST, row.Notes].map((value, cellIndex) => (
+                        <td key={cellIndex} style={cellStyle}>{isBlank(value) ? "—" : String(value)}</td>
+                      ))}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
-export default IDPMS;
+const primaryButton = {
+  border: 0, borderRadius: 7, padding: "11px 20px",
+  background: "#0284c7", color: "#fff", fontWeight: 700, cursor: "pointer",
+};
+const downloadButton = {
+  ...primaryButton, background: "#16a34a",
+};
+const secondaryButton = {
+  border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 10px",
+  background: "#fff", cursor: "pointer", fontSize: 12,
+};

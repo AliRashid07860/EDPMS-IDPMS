@@ -1,20 +1,15 @@
-
 import * as pdfjsLib from "pdfjs-dist";
 
 // PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-const DEFAULT_USER = "Diwakar";
+// Default User set to blank
+const DEFAULT_USER = "";
 
 function clean(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
-
-// function toNumber(value) {
-//   const n = Number(String(value ?? "").replace(/,/g, "").replace(/[^\d.-]/g, ""));
-//   return Number.isFinite(n) ? n : 0;
-// }
 
 function parseAmountToken(value) {
   const m = String(value ?? "").replace(/,/g, "").match(/^-?\d+(?:\.\d+)?$/);
@@ -231,18 +226,36 @@ function extractInvoiceFromPage(page) {
     r.items.map((i) => i.str).join(" ")
   );
 
+  // --- NAYA INVOICE EXTRACTION LOGIC ---
   let invoiceNo = "";
+  let passedHeader = false;
 
-  const invoicePattern = /\b[A-Z][A-Z0-9]*-[A-Z0-9]+\b/;
-
-  for (const line of lines.slice(partIndex + 1, partIndex + 12)) {
-    const match = line.match(invoicePattern);
-
-    if (match) {
-      invoiceNo = match[0];
+  for (const line of lines.slice(partIndex + 1, partIndex + 15)) {
+    // 1. Agar Invoice aur Date ek hi line mein hain (e.g., "INV202610035 14-OCT-26")
+    const dateMatch = line.match(/\b([A-Z0-9\-_]{4,25})\s*(?:\|)?\s*\d{2}-[A-Z]{3}-\d{2}\b/i);
+    if (dateMatch && !/^(CHINA|INDIA|DATE|SELLER|BUYER)$/i.test(dateMatch[1])) {
+      invoiceNo = dateMatch[1];
       break;
     }
+
+    // 2. Track karein ki parser "2. INVOICE NO" header cross kar chuka hai
+    if (/2\.\s*INVOICE\s*NO/i.test(line)) {
+      passedHeader = true;
+      continue;
+    }
+
+    // 3. Header cross karne ke baad jo pehla valid alphanumeric string milega, wo invoice hoga
+    if (passedHeader) {
+      const cleanLine = line.replace(/\|/g, "").trim();
+      const tokenMatch = cleanLine.match(/\b[A-Z0-9\-_]{4,25}\b/i);
+      
+      if (tokenMatch && !/^(CHINA|INDIA|BUYER|SELLER|NAME|ADDRESS)$/i.test(tokenMatch[0])) {
+        invoiceNo = tokenMatch[0];
+        break;
+      }
+    }
   }
+  // -------------------------------------
 
   if (!invoiceNo) return null;
 
@@ -375,7 +388,7 @@ function extractDutySummary(page) {
 }
 
 function getMetadata(supplier) {
-  const name = supplier.toUpperCase();
+  const name = (supplier || "").toUpperCase();
 
   if (name.includes("YOULI OPTICS")) {
     return {
